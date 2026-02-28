@@ -28,8 +28,11 @@ export async function POST(req: Request) {
 
   const pptxBuf = await buildStoryboardPptxBuffer({ shotlist, metadata });
   const filename = `${metadata.project_name.replace(/[^\w\-]+/g, "_")}_Storyboard.pptx`;
+  
+  // Convert Buffer to Uint8Array for NextResponse compatibility
+  const uint8Array = new Uint8Array(pptxBuf);
 
-  return new NextResponse(pptxBuf, {
+  return new NextResponse(uint8Array, {
     status: 200,
     headers: {
       "Content-Type":
