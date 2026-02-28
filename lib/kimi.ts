@@ -19,46 +19,73 @@ export async function callKimiAgent<T>({
     throw new Error("OpenAI API key not configured");
   }
 
-  const systemPrompt = agentId.includes("storyboard")
-    ? `You are an expert Storyboard Artist AI. Given a shotlist and metadata, enhance each shot with detailed visual descriptions and composition notes. Return ONLY valid JSON format with "updated_shotlist" containing the enhanced shots array.`
-    : `You are an expert Hollywood Shot Director AI with 20 years of experience in feature films. Given a structured script and metadata, generate a comprehensive shotlist following industry standards. 
+  const isStoryboard = agentId.includes("storyboard");
+  
+  const systemPrompt = isStoryboard
+    ? `You are a Storyboard Artist AI. Enhance the provided shotlist with visual descriptions. Return JSON: {"updated_shotlist":{"shots":[...]}}`
+    : `You are a Hollywood Shot Director. Generate a shotlist from the script provided. 
+    
+IMPORTANT: Return JSON in this exact format:
+{
+  "shots": [
+    {
+      "shot_id": "S001",
+      "scene_id": "SC001",
+      "beat_id": "B001",
+      "shot_type": "WS",
+      "action": "description here",
+      "intent": "purpose here",
+      "camera": {"angle":"eye-level","height":"standing","movement":"static","support":"tripod"},
+      "lens": {"mm_range":"24mm","rationale":"wide establishing"},
+      "continuity_notes": {"line_of_action":"left to right","eyelines":"match","match_action":"N/A","props_wardrobe":"check coffee cup"},
+      "risk_flags": []
+    }
+  ]
+}
 
-For each shot, include:
-- shot_id (format: S001, S002, etc.)
-- scene_id (from input)
-- shot_type (WS, MS, CU, OTS, POV, INSERT, ELS, etc.)
-- action (detailed blocking description)
-- intent (emotional/story purpose)
-- camera: {angle, height, movement, support}
-- lens: {mm_range, rationale}
-- continuity_notes: {line_of_action, eyelines, match_action, props_wardrobe}
-- risk_flags (array of strings)
-
-Return ONLY valid JSON format with a "shots" array containing 2-5 shots per scene. Be specific with lens choices (e.g., "24mm", "85mm") and camera movements.`;
+Generate 3-5 shots per scene.`;
 
   try {
+    console.log("Calling OpenAI with payload:", JSON.stringify(payload).slice(0, 200));
+    
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-3.5-turbo", // Use gpt-3.5-turbo for reliability (or gpt-4 if you have access)
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: JSON.stringify(payload) }
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 2000,
     });
 
     const content = completion.choices[0].message.content;
+    console.log("OpenAI response:", content?.slice(0, 500));
+    
     if (!content) {
       throw new Error("Empty response from OpenAI");
     }
 
-    // Extract JSON from response (in case GPT adds markdown or text)
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
+    // Try to extract JSON
+    let jsonStr = content;
+    
+    // If wrapped in markdown code blocks, extract it
+    if (content.includes("```json")) {
+      jsonStr = content.split("```json")[1].split("```")[0];
+    } else if (content.includes("```")) {
+      jsonStr = content.split("```")[1].split("```")[0];
     }
-
-    return JSON.parse(jsonMatch[0]) as T;
+    
+    jsonStr = jsonStr.trim();
+    
+    const parsed = JSON.parse(jsonStr);
+    console.log("Parsed successfully:", Object.keys(parsed));
+    
+    // If it's the shot director and doesn't have shots array, wrap it
+    if (!isStoryboard && !parsed.shots && Array.isArray(parsed)) {
+      return { shots: parsed } as T;
+    }
+    
+    return parsed as T;
   } catch (error: any) {
     console.error("OpenAI API error:", error);
     throw new Error(`AI generation failed: ${error.message}`);
