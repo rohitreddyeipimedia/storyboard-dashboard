@@ -166,6 +166,6 @@ export async function buildStoryboardPptxBuffer({
     });
   }
 
-  const arr = await pptx.write({ outputType: "arraybuffer" });
+  const arr = await pptx.write({ outputType: "arraybuffer" }) as ArrayBuffer;
   return Buffer.from(arr);
 }
