@@ -5,141 +5,107 @@ import { MetadataSchema, StructuredScriptSchema, ShotlistSchema } from "@/lib/sc
 
 export const runtime = "nodejs";
 
+function generateShotFromBeat(beat: any, shotNum: number, sceneId: string): any {
+  const action = beat.action || "";
+  const isCloseUp = action.toLowerCase().match(/close-up|face|expression|eyes|reaction/);
+  const isProduct = action.toLowerCase().match(/product|box|bottle|shoe|bowl|pack/);
+  const isDialogue = action.includes('"');
+  const isAction = action.toLowerCase().match(/bowling|running|walking|moving/);
+  const isInsert = action.toLowerCase().match(/milk|spoon|crunch|detail|hand/);
+  
+  let shotType = "MS";
+  let lens = "35mm";
+  let angle = "eye-level";
+  
+  if (isCloseUp) { shotType = "CU"; lens = "85mm"; }
+  else if (isProduct && isCloseUp) { shotType = "INSERT"; lens = "100mm"; angle = "flat"; }
+  else if (isProduct) { shotType = "MCU"; lens = "50mm"; }
+  else if (isInsert) { shotType = "INSERT"; lens = "100mm"; }
+  else if (isDialogue && !isAction) { shotType = "MCU"; lens = "50mm"; }
+  else if (isAction) { shotType = "WS"; lens = "24mm"; angle = "low"; }
+  else if (shotNum === 1) { shotType = "WS"; lens = "24mm"; }
+  
+  // Generate sketch description for the storyboard frame
+  const sketchDescription = generateSketchDescription(action, shotType);
+  
+  return {
+    shot_id: `S${String(shotNum).padStart(3, "0")}`,
+    scene_id: sceneId,
+    beat_id: beat.beat_id,
+    shot_type: shotType,
+    action: action.slice(0, 150),
+    intent: generateIntent(action),
+    camera: { 
+      angle: angle, 
+      height: shotType === "INSERT" ? "table" : "chest", 
+      movement: isAction ? "track" : "static", 
+      support: isAction ? "dolly" : "tripod" 
+    },
+    lens: { 
+      mm_range: lens, 
+      rationale: getLensRationale(shotType) 
+    },
+    continuity_notes: {
+      line_of_action: isAction ? "Action axis" : "Standard",
+      eyelines: isDialogue ? "Match" : "N/A",
+      match_action: isAction ? "Cut on action" : "N/A",
+      props_wardrobe: isProduct ? "Hero product visible" : "Check continuity",
+    },
+    risk_flags: [],
+    sketch_description: sketchDescription // For the PPT visual
+  };
+}
+
+function generateSketchDescription(action: string, shotType: string): string {
+  // Create a visual description for placeholder
+  const subject = action.match(/(Arshdeep|Manager|Brand Manager|Director)/)?.[0] || "Character";
+  
+  if (shotType === "INSERT") {
+    const product = action.match(/(toothpaste|shoe|bottle|muesli|bowl|spoon)/i)?.[0] || "product";
+    return `Detail shot of ${product} - clean background, soft lighting, 45° angle`;
+  }
+  if (shotType === "CU" || shotType === "ECU") {
+    return `Close-up on ${subject}'s face - emotional reaction, shallow depth of field`;
+  }
+  if (shotType === "WS") {
+    return `Wide shot: Full body ${subject} in environment - establishing context`;
+  }
+  if (action.includes('"')) {
+    return `Medium shot: ${subject} speaking - dialogue delivery, engaged expression`;
+  }
+  return `Medium close-up: ${subject} in action - ${action.slice(0, 40)}...`;
+}
+
+function generateIntent(action: string): string {
+  if (action.includes('"')) return "Deliver dialogue / emotional beat";
+  if (action.match(/stares|looks|expression/)) return "Show character reaction";
+  if (action.match(/product|present|hold/)) return "Product showcase";
+  if (action.match(/bowling|running|action/)) return "Action coverage";
+  return "Advance narrative";
+}
+
+function getLensRationale(shotType: string): string {
+  const rationales: Record<string, string> = {
+    "WS": "Spatial context, geography",
+    "MS": "Natural perspective, subject focus",
+    "MCU": "Intimacy while retaining context",
+    "CU": "Emotional emphasis, isolation",
+    "ECU": "Maximum intimacy, detail",
+    "INSERT": "Product detail, texture",
+    "OTS": "Spatial relationship, dialogue"
+  };
+  return rationales[shotType] || "Standard coverage";
+}
+
 function comprehensiveMockShotlist(structured: any) {
   const shots: any[] = [];
   let shotCounter = 1;
   
-  structured.scenes?.forEach((scene: any, sceneIdx: number) => {
-    const scene_id = scene.scene_id || `SC${String(sceneIdx + 1).padStart(3, "0")}`;
-    const beat_id = scene.beats?.[0]?.beat_id || "B001";
-    const content = scene.beats?.map((b: any) => b.action).join(" ") || "";
-    
-    const isAction = content.toLowerCase().includes("bowling") || content.toLowerCase().includes("running");
-    const isProduct = content.toLowerCase().includes("product") || content.toLowerCase().includes("box") || content.toLowerCase().includes("bottle") || content.toLowerCase().includes("shoe");
-    
-    // Shot 1: Establishing/Master
-    shots.push({
-      shot_id: `S${String(shotCounter++).padStart(3, "0")}`,
-      scene_id,
-      beat_id,
-      shot_type: sceneIdx === 0 ? "WS" : "MS",
-      action: scene.beats?.[0]?.action?.slice(0, 100) || "Scene establishment",
-      intent: "Establish geography and character positions",
-      camera: { angle: "eye-level", height: "standing", movement: isAction ? "pan" : "static", support: "tripod" },
-      lens: { mm_range: sceneIdx === 0 ? "24mm" : "35mm", rationale: "Context and spatial relationships" },
-      continuity_notes: {
-        line_of_action: "Establish 180° line",
-        eyelines: "Match screen direction",
-        match_action: "N/A",
-        props_wardrobe: "Check continuity of hero props",
-      },
-      risk_flags: [],
+  // Generate ONE shot per beat (sentence), not per scene
+  structured.scenes?.forEach((scene: any) => {
+    scene.beats?.forEach((beat: any) => {
+      shots.push(generateShotFromBeat(beat, shotCounter++, scene.scene_id));
     });
-    
-    // Shot 2: Character focus
-    if (content.includes("Arshdeep")) {
-      shots.push({
-        shot_id: `S${String(shotCounter++).padStart(3, "0")}`,
-        scene_id,
-        beat_id,
-        shot_type: "MCU",
-        action: "Arshdeep reaction/performance",
-        intent: "Connect audience to character emotion",
-        camera: { angle: "eye-level", height: "chest", movement: "static", support: "tripod" },
-        lens: { mm_range: "50mm", rationale: "Natural perspective, slight compression" },
-        continuity_notes: {
-          line_of_action: "Maintain screen direction",
-          eyelines: "Match to OTS or previous shot",
-          match_action: "N/A",
-          props_wardrobe: "Consistent with master",
-        },
-        risk_flags: [],
-      });
-    }
-    
-    // Shot 3: Insert/CU for products or details
-    if (isProduct || content.includes('"')) {
-      shots.push({
-        shot_id: `S${String(shotCounter++).padStart(3, "0")}`,
-        scene_id,
-        beat_id,
-        shot_type: isProduct ? "INSERT" : "CU",
-        action: isProduct ? "Product detail/reveal" : "Dialogue delivery emphasis",
-        intent: isProduct ? "Highlight product features" : "Emphasize emotional beat",
-        camera: { angle: "flat", height: "table", movement: "static", support: "tripod" },
-        lens: { mm_range: "85mm", rationale: "Shallow depth, isolation" },
-        continuity_notes: {
-          line_of_action: "N/A",
-          eyelines: "N/A",
-          match_action: "Cut on action if applicable",
-          props_wardrobe: "Hero product presentation",
-        },
-        risk_flags: [],
-      });
-    }
-    
-    // Shot 4: Counter shot or reverse angle
-    if (content.includes("Manager") || content.includes("Brand Manager")) {
-      shots.push({
-        shot_id: `S${String(shotCounter++).padStart(3, "0")}`,
-        scene_id,
-        beat_id,
-        shot_type: "OTS",
-        action: "Over-the-shoulder on opposing character",
-        intent: "Show spatial relationship and reaction",
-        camera: { angle: "eye-level", height: "standing", movement: "static", support: "tripod" },
-        lens: { mm_range: "50mm", rationale: "Match perspective" },
-        continuity_notes: {
-          line_of_action: "Respect established line",
-          eyelines: "Match to MCU",
-          match_action: "N/A",
-          props_wardrobe: "Continuity check",
-        },
-        risk_flags: [],
-      });
-    }
-    
-    // Shot 5: Dynamic action if applicable
-    if (isAction) {
-      shots.push({
-        shot_id: `S${String(shotCounter++).padStart(3, "0")}`,
-        scene_id,
-        beat_id,
-        shot_type: "WS",
-        action: "Action coverage - bowling/movement",
-        intent: "Show physical action clearly",
-        camera: { angle: "low", height: "waist", movement: "track", support: "dolly" },
-        lens: { mm_range: "35mm", rationale: "Dynamic feel, context" },
-        continuity_notes: {
-          line_of_action: "Action axis",
-          eyelines: "N/A",
-          match_action: "Frame for continuity",
-          props_wardrobe: "Action continuity",
-        },
-        risk_flags: ["safety"],
-      });
-    }
-    
-    // Shot 6: Reaction/ECU for emotional moments
-    if (content.toLowerCase().includes("stares") || content.toLowerCase().includes("looks") || content.toLowerCase().includes("expression")) {
-      shots.push({
-        shot_id: `S${String(shotCounter++).padStart(3, "0")}`,
-        scene_id,
-        beat_id,
-        shot_type: "ECU",
-        action: "Extreme close-up on eyes/face",
-        intent: "Maximum emotional impact",
-        camera: { angle: "eye-level", height: "eye", movement: "static", support: "tripod" },
-        lens: { mm_range: "100mm", rationale: "Intimacy, compression" },
-        continuity_notes: {
-          line_of_action: "N/A",
-          eyelines: "Critical match",
-          match_action: "N/A",
-          props_wardrobe: "N/A",
-        },
-        risk_flags: [],
-      });
-    }
   });
 
   return { shots };
@@ -154,10 +120,9 @@ export async function POST(req: Request) {
   const metadata = MetadataSchema.parse(body.metadata ?? {});
   const structured_script = StructuredScriptSchema.parse(body.structured_script);
   const guideline_text = String(body.guideline_text ?? HOLLYWOOD_GUIDE_TEXT);
-  const revision_notes = body.revision_notes ?? undefined;
 
-  const sceneCount = structured_script.scenes?.length || 0;
-  const expectedShots = Math.max(20, sceneCount * 4);
+  const totalBeats = structured_script.scenes?.reduce((acc: number, s: any) => acc + (s.beats?.length || 0), 0) || 0;
+  console.log(`Generating ${totalBeats} shots from ${structured_script.scenes?.length} scenes`);
 
   if (kimiEnabled()) {
     const agentId = process.env.KIMI_SHOT_DIRECTOR_AGENT_ID || "shot_director";
@@ -165,22 +130,15 @@ export async function POST(req: Request) {
       structured_script,
       metadata,
       guideline_text,
-      revision_notes,
-      instructions: `Generate a comprehensive shotlist with APPROXIMATELY ${expectedShots} shots total. This script has ${sceneCount} scenes. Aim for 4-6 shots per scene for full coverage.`
+      instructions: `Generate EXACTLY ${totalBeats} shots - one shot per beat/sentence provided. Do not combine multiple actions into one shot. Each sentence becomes one shot with specific framing. Include sketch_description for each shot describing what the storyboard frame should show.`
     };
 
     try {
       const kimiResp = await callKimiAgent<any>({ agentId, payload: kimiPayload });
       const shotlist = ShotlistSchema.parse(kimiResp.shotlist ?? kimiResp);
-      
-      if (shotlist.shots.length < 10) {
-        console.warn(`AI returned only ${shotlist.shots.length} shots, using comprehensive mock`);
-        return NextResponse.json({ shotlist: comprehensiveMockShotlist(structured_script), mode: "mock-enhanced" });
-      }
-      
       return NextResponse.json({ shotlist, mode: "kimi" });
     } catch (error) {
-      console.error("AI failed, falling back to comprehensive mock:", error);
+      console.error("AI failed, using sentence-based mock:", error);
       return NextResponse.json({ shotlist: comprehensiveMockShotlist(structured_script), mode: "mock-enhanced" });
     }
   }
