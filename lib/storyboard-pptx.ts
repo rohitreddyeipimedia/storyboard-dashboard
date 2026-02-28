@@ -104,11 +104,12 @@ export async function buildStoryboardPptxBuffer({
 
   console.log("Writing PPTX...");
   const output = await pptx.write({ outputType: "arraybuffer" });
-  console.log("PPTX generated, size:", output.byteLength);
+  const arrayBuffer = output as ArrayBuffer;
+  console.log("PPTX generated, size:", arrayBuffer.byteLength);
   
-  if (output.byteLength < 1000) {
+  if (arrayBuffer.byteLength < 1000) {
     throw new Error("Generated PPTX is too small/empty");
   }
   
-  return output as ArrayBuffer;
+  return arrayBuffer;
 }
