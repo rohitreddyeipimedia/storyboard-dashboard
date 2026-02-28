@@ -13,13 +13,11 @@ function safeText(input: unknown, fallback: string) {
 }
 
 function setLayoutFromAspect(pptx: PptxGenJS, aspect: Metadata["aspect_ratio"]) {
-  // PptxGen has built-in layouts; portrait is not perfect but acceptable.
-  // If you later want true 9:16 sizing, we can set pptx.defineLayout with custom dims.
   if (aspect === "9:16") {
-    // closest built-in portrait
-    pptx.layout = "LAYOUT_A4"; // portrait-ish; not exactly 9:16
+    // closest built-in portrait-ish layout
+    pptx.layout = "LAYOUT_A4";
   } else {
-    pptx.layout = "LAYOUT_WIDE"; // 13.33 x 7.5
+    pptx.layout = "LAYOUT_WIDE";
   }
 }
 
@@ -30,13 +28,10 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
 
   pptx.author = "Storyboard Dashboard";
 
-  // FIX: schema uses project_title, not project_name
   const projectTitle = safeText(metadata.project_title, "Untitled");
   pptx.company = projectTitle;
 
-  // For LAYOUT_WIDE: 13.33 x 7.5
-  // For LAYOUT_A4: PptxGen internal dims differ, but we can still place roughly.
-  // We'll use a conservative layout that works for both.
+  // WIDE baseline coords; still works acceptably for A4 with minor spacing differences.
   const W = 13.33;
   const H = 7.5;
 
@@ -92,8 +87,8 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
         h: 1.1,
         fill: { color: colors.panel },
         line: { color: colors.stroke },
-        radius: 10,
       });
+
       slide.addText(note, {
         x: 1.05,
         y: 2.95,
@@ -131,7 +126,6 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
       h: 6.1,
       fill: { color: colors.panel },
       line: { color: colors.stroke },
-      radius: 12,
     });
 
     slide.addText(shot.sketch_description || "Storyboard frame placeholder", {
@@ -153,7 +147,6 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
       h: 6.1,
       fill: { color: colors.panel },
       line: { color: colors.stroke },
-      radius: 12,
     });
 
     const lines: string[] = [];
