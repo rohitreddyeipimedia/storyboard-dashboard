@@ -1,15 +1,11 @@
-type KimiConfig = {
-  baseUrl?: string;
-  apiKey?: string;
-};
+import OpenAI from "openai";
 
-const config: KimiConfig = {
-  baseUrl: process.env.KIMI_BASE_URL,
-  apiKey: process.env.KIMI_API_KEY,
-};
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export function kimiEnabled() {
-  return Boolean(config.baseUrl && config.apiKey);
+  return Boolean(process.env.OPENAI_API_KEY);
 }
 
 export async function callKimiAgent<T>({
@@ -20,22 +16,45 @@ export async function callKimiAgent<T>({
   payload: any;
 }): Promise<T> {
   if (!kimiEnabled()) {
-    throw new Error("KIMI not configured");
+    throw new Error("OpenAI API key not configured");
   }
 
-  const res = await fetch(`${config.baseUrl}/agents/${agentId}/run`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const systemPrompt = agentId.includes("storyboard")
+    ? `You are an expert Storyboard Artist AI. Given a shotlist and metadata, enhance each shot with detailed visual descriptions and composition notes. Return JSON format with "updated_shotlist" containing the enhanced shots array.`
+    : `You are an expert Hollywood Shot Director AI with 20 years of experience in feature films. Given a structured script and metadata, generate a comprehensive shotlist following industry standards. 
 
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`KIMI call failed: ${res.status} ${txt}`);
+For each shot, include:
+- shot_id (format: S001, S002, etc.)
+- scene_id (from input)
+- shot_type (WS, MS, CU, OTS, POV, INSERT, ELS, etc.)
+- action (detailed blocking description)
+- intent (emotional/story purpose)
+- camera: {angle, height, movement, support}
+- lens: {mm_range, rationale}
+- continuity_notes: {line_of_action, eyelines, match_action, props_wardrobe}
+- risk_flags (array of strings)
+
+Return JSON format with a "shots" array containing 2-5 shots per scene. Be specific with lens choices (e.g., "24mm", "85mm") and camera movements.`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: JSON.stringify(payload) }
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" }
+    });
+
+    const content = completion.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    return JSON.parse(content) as T;
+  } catch (error: any) {
+    console.error("OpenAI API error:", error);
+    throw new Error(`AI generation failed: ${error.message}`);
   }
-
-  return (await res.json()) as T;
 }
