@@ -113,32 +113,58 @@ export default function Home() {
     }
   }
 
+  // Color scheme
+  const colors = {
+    bg: "#0f172a",
+    panel: "#1e293b",
+    border: "#334155",
+    text: "#f1f5f9",
+    textMuted: "#94a3b8",
+    textDark: "#cbd5e1",
+    input: "#0f172a",
+    primary: "#3b82f6",
+    success: "#10b981",
+    error: "#ef4444"
+  };
+
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
-      <header style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: 24, background: colors.bg, minHeight: "100vh" }}>
+      <header style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "flex-start", 
+        marginBottom: 32,
+        paddingBottom: 24,
+        borderBottom: `1px solid ${colors.border}`,
+        flexWrap: "wrap",
+        gap: 16
+      }}>
         <div>
-          <h1 style={{ margin: 0 }}>Storyboard Dashboard</h1>
-          <p style={{ marginTop: 6, opacity: 0.75 }}>
-            Script → Shot Director → Approve → Storyboard PPTX{" "}
-            {mode ? <strong>({mode})</strong> : null}
+          <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, color: colors.text }}>
+            Storyboard Dashboard
+          </h1>
+          <p style={{ marginTop: 8, color: colors.textMuted, fontSize: 14 }}>
+            Script → Shot Director → Approve → Storyboard PPTX
+            {mode ? <span style={{ marginLeft: 8, padding: "4px 8px", background: colors.primary, borderRadius: 4, fontSize: 12, fontWeight: 600 }}>{mode}</span> : null}
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {steps.map((s) => (
             <button
               key={s.id}
               onClick={() => (s.id === 1 ? setStep(1) : s.enabled ? setStep(s.id as any) : null)}
               disabled={s.id !== 1 && !s.enabled}
               style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid #2a2f3a",
-                background: step === s.id ? "#1b2435" : "#121722",
-                color: "white",
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: "none",
+                background: step === s.id ? colors.primary : s.enabled ? colors.panel : "#1e293b",
+                color: step === s.id || s.enabled ? colors.text : colors.textMuted,
                 cursor: s.id === 1 || s.enabled ? "pointer" : "not-allowed",
                 opacity: s.id === 1 || s.enabled ? 1 : 0.5,
-                fontWeight: 650,
+                fontWeight: 600,
+                fontSize: 14,
               }}
             >
               {s.id}) {s.label}
@@ -147,45 +173,65 @@ export default function Home() {
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.25fr .75fr", gap: 12, marginTop: 12 }}>
-        <main style={{ background: "#0f1420", border: "1px solid #222a38", borderRadius: 16, padding: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24 }}>
+        <main style={{ 
+          background: colors.panel, 
+          border: `1px solid ${colors.border}`, 
+          borderRadius: 12, 
+          padding: 24,
+          color: colors.text
+        }}>
           {error ? (
-            <div style={{ background: "#2a1212", border: "1px solid #5a1c1c", borderRadius: 12, padding: 10, marginBottom: 10 }}>
+            <div style={{ 
+              background: "rgba(239, 68, 68, 0.1)", 
+              border: `1px solid ${colors.error}`, 
+              borderRadius: 8, 
+              padding: 12, 
+              marginBottom: 16,
+              color: colors.error
+            }}>
               {error}
             </div>
           ) : null}
 
           {step === 1 && (
             <>
-              <h2 style={{ marginTop: 0 }}>Upload / Paste Script</h2>
+              <h2 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>Upload / Paste Script</h2>
               <textarea
                 value={scriptText}
                 onChange={(e) => setScriptText(e.target.value)}
-                placeholder="Paste script here..."
-                rows={14}
+                placeholder="Paste your screenplay here..."
+                rows={12}
                 style={{
                   width: "100%",
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #2a2f3a",
-                  background: "#0b1020",
-                  color: "white",
+                  padding: 16,
+                  borderRadius: 8,
+                  border: `1px solid ${colors.border}`,
+                  background: colors.input,
+                  color: colors.text,
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  resize: "vertical",
+                  fontFamily: "inherit"
                 }}
               />
-              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
                 <button
                   onClick={generateShotlist}
                   disabled={busy}
                   style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid #3b82f6",
-                    background: "#1d3b73",
+                    padding: "12px 20px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: colors.primary,
                     color: "white",
-                    fontWeight: 700,
+                    fontWeight: 600,
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.7 : 1,
+                    fontSize: 14
                   }}
                 >
-                  {busy ? "Working..." : "Generate Shotlist"}
+                  {busy ? "Processing..." : "Generate Shotlist"}
                 </button>
                 <button
                   onClick={() => {
@@ -199,12 +245,13 @@ export default function Home() {
                   }}
                   disabled={busy}
                   style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid #2a2f3a",
-                    background: "#121722",
-                    color: "white",
-                    fontWeight: 650,
+                    padding: "12px 20px",
+                    borderRadius: 8,
+                    border: `1px solid ${colors.border}`,
+                    background: "transparent",
+                    color: colors.text,
+                    fontWeight: 600,
+                    cursor: "pointer"
                   }}
                 >
                   Reset
@@ -212,21 +259,21 @@ export default function Home() {
               </div>
 
               {structuredScript ? (
-                <pre style={{ marginTop: 12, fontSize: 12, opacity: 0.9, whiteSpace: "pre-wrap" }}>
+                <div style={{ marginTop: 16, padding: 12, background: colors.input, borderRadius: 8, color: colors.textMuted, fontSize: 13 }}>
                   Parsed scenes: {structuredScript.scenes?.length ?? 0}
-                </pre>
+                </div>
               ) : null}
             </>
           )}
 
           {step === 2 && (
             <>
-              <h2 style={{ marginTop: 0 }}>Shotlist Review</h2>
-              <p style={{ opacity: 0.75, marginTop: 6 }}>
-                Review and approve. (Change requests can be wired into revision_notes later.)
+              <h2 style={{ marginTop: 0, marginBottom: 8, color: colors.text }}>Shotlist Review</h2>
+              <p style={{ color: colors.textMuted, marginTop: 0, marginBottom: 16, fontSize: 14 }}>
+                Review the generated shots. Approve to proceed to storyboard generation.
               </p>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
                 <button
                   onClick={() => {
                     setApproved(shotlist);
@@ -234,15 +281,16 @@ export default function Home() {
                   }}
                   disabled={busy || !shotlist}
                   style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid #22c55e",
-                    background: "#124026",
+                    padding: "12px 20px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: colors.success,
                     color: "white",
-                    fontWeight: 700,
+                    fontWeight: 600,
+                    cursor: "pointer"
                   }}
                 >
-                  Approve Shotlist
+                  ✓ Approve Shotlist
                 </button>
 
                 <button
@@ -259,43 +307,54 @@ export default function Home() {
                   }}
                   disabled={!shotlist}
                   style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid #2a2f3a",
-                    background: "#121722",
-                    color: "white",
-                    fontWeight: 650,
+                    padding: "12px 20px",
+                    borderRadius: 8,
+                    border: `1px solid ${colors.border}`,
+                    background: "transparent",
+                    color: colors.text,
+                    fontWeight: 600,
+                    cursor: "pointer"
                   }}
                 >
-                  Download shotlist.json
+                  Download JSON
                 </button>
               </div>
 
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <div style={{ overflowX: "auto", borderRadius: 8, border: `1px solid ${colors.border}` }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, background: colors.input }}>
                   <thead>
-                    <tr style={{ textAlign: "left", opacity: 0.8 }}>
-                      <th style={{ padding: 8, borderBottom: "1px solid #2a2f3a" }}>Shot</th>
-                      <th style={{ padding: 8, borderBottom: "1px solid #2a2f3a" }}>Type</th>
-                      <th style={{ padding: 8, borderBottom: "1px solid #2a2f3a" }}>Action</th>
-                      <th style={{ padding: 8, borderBottom: "1px solid #2a2f3a" }}>Intent</th>
-                      <th style={{ padding: 8, borderBottom: "1px solid #2a2f3a" }}>Move</th>
-                      <th style={{ padding: 8, borderBottom: "1px solid #2a2f3a" }}>Lens</th>
+                    <tr style={{ background: colors.panel }}>
+                      <th style={{ padding: 12, textAlign: "left", color: colors.text, borderBottom: `2px solid ${colors.border}`, fontWeight: 600 }}>Shot</th>
+                      <th style={{ padding: 12, textAlign: "left", color: colors.text, borderBottom: `2px solid ${colors.border}`, fontWeight: 600 }}>Type</th>
+                      <th style={{ padding: 12, textAlign: "left", color: colors.text, borderBottom: `2px solid ${colors.border}`, fontWeight: 600 }}>Action</th>
+                      <th style={{ padding: 12, textAlign: "left", color: colors.text, borderBottom: `2px solid ${colors.border}`, fontWeight: 600 }}>Intent</th>
+                      <th style={{ padding: 12, textAlign: "left", color: colors.text, borderBottom: `2px solid ${colors.border}`, fontWeight: 600 }}>Camera</th>
+                      <th style={{ padding: 12, textAlign: "left", color: colors.text, borderBottom: `2px solid ${colors.border}`, fontWeight: 600 }}>Lens</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(shotlist?.shots ?? []).map((s: any) => (
-                      <tr key={s.shot_id}>
-                        <td style={{ padding: 8, borderBottom: "1px solid #1f2533", fontFamily: "ui-monospace" }}>
+                      <tr key={s.shot_id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: 12, color: colors.primary, fontFamily: "monospace", fontWeight: 600 }}>
                           {s.shot_id}
                         </td>
-                        <td style={{ padding: 8, borderBottom: "1px solid #1f2533" }}>{s.shot_type}</td>
-                        <td style={{ padding: 8, borderBottom: "1px solid #1f2533" }}>{s.action}</td>
-                        <td style={{ padding: 8, borderBottom: "1px solid #1f2533", opacity: 0.85 }}>{s.intent}</td>
-                        <td style={{ padding: 8, borderBottom: "1px solid #1f2533", opacity: 0.85 }}>
+                        <td style={{ padding: 12, color: colors.text }}>
+                          <span style={{ 
+                            padding: "2px 8px", 
+                            background: colors.primary, 
+                            borderRadius: 4, 
+                            fontSize: 12,
+                            fontWeight: 600 
+                          }}>
+                            {s.shot_type}
+                          </span>
+                        </td>
+                        <td style={{ padding: 12, color: colors.textDark, maxWidth: 300 }}>{s.action}</td>
+                        <td style={{ padding: 12, color: colors.textMuted }}>{s.intent}</td>
+                        <td style={{ padding: 12, color: colors.textMuted, fontSize: 12 }}>
                           {s.camera?.movement}
                         </td>
-                        <td style={{ padding: 8, borderBottom: "1px solid #1f2533", opacity: 0.85 }}>
+                        <td style={{ padding: 12, color: colors.textMuted, fontSize: 12 }}>
                           {s.lens?.mm_range}
                         </td>
                       </tr>
@@ -308,108 +367,192 @@ export default function Home() {
 
           {step === 3 && (
             <>
-              <h2 style={{ marginTop: 0 }}>Storyboard Review</h2>
-              <p style={{ opacity: 0.75, marginTop: 6 }}>
-                Generates a PPTX (1 slide per shot). In KIMI mode, you can return sketch_image_url per shot.
+              <h2 style={{ marginTop: 0, marginBottom: 8, color: colors.text }}>Storyboard Review</h2>
+              <p style={{ color: colors.textMuted, marginTop: 0, marginBottom: 16, fontSize: 14 }}>
+                Generate PowerPoint presentation with {approved?.shots?.length || 0} slides.
               </p>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button
                   onClick={downloadStoryboardPptx}
                   disabled={busy || !approved}
                   style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid #3b82f6",
-                    background: "#1d3b73",
+                    padding: "12px 24px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: colors.primary,
                     color: "white",
-                    fontWeight: 700,
+                    fontWeight: 600,
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.7 : 1,
+                    fontSize: 14
                   }}
                 >
-                  {busy ? "Building..." : "Download Storyboard PPTX"}
+                  {busy ? "Building..." : "Download PPTX"}
                 </button>
               </div>
 
-              <div style={{ marginTop: 12, opacity: 0.8, fontSize: 12 }}>
-                Slides: {approved?.shots?.length ?? 0}
+              <div style={{ 
+                marginTop: 24, 
+                padding: 24, 
+                background: colors.input, 
+                borderRadius: 8,
+                border: `1px dashed ${colors.border}`,
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
+                <div style={{ color: colors.text, fontWeight: 600, marginBottom: 4 }}>
+                  {approved?.shots?.length || 0} shots ready
+                </div>
+                <div style={{ color: colors.textMuted, fontSize: 13 }}>
+                  PowerPoint format (.pptx) with frames and notes
+                </div>
               </div>
             </>
           )}
         </main>
 
-        <aside style={{ background: "#0f1420", border: "1px solid #222a38", borderRadius: 16, padding: 14 }}>
-          <h3 style={{ marginTop: 0 }}>Project Settings</h3>
+        <aside style={{ 
+          background: colors.panel, 
+          border: `1px solid ${colors.border}`, 
+          borderRadius: 12, 
+          padding: 24,
+          height: "fit-content"
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: 20, color: colors.text, fontSize: 18 }}>Project Settings</h3>
 
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Project Name</label>
+          <label style={{ display: "block", fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: 500 }}>
+            Project Name
+          </label>
           <input
             value={metadata.project_name}
             onChange={(e) => setMetadata((m) => ({ ...m, project_name: e.target.value }))}
-            style={inputStyle}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.input,
+              color: colors.text,
+              marginBottom: 16,
+              fontSize: 14
+            }}
           />
 
-          <label style={{ fontSize: 12, opacity: 0.8, marginTop: 10, display: "block" }}>Aspect Ratio</label>
+          <label style={{ display: "block", fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: 500 }}>
+            Aspect Ratio
+          </label>
           <select
             value={metadata.aspect_ratio}
             onChange={(e) => setMetadata((m) => ({ ...m, aspect_ratio: e.target.value as any }))}
-            style={inputStyle}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.input,
+              color: colors.text,
+              marginBottom: 16,
+              fontSize: 14
+            }}
           >
-            <option value="16:9">16:9</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
+            <option value="16:9">16:9 Widescreen</option>
+            <option value="9:16">9:16 Vertical</option>
+            <option value="1:1">1:1 Square</option>
           </select>
 
-          <label style={{ fontSize: 12, opacity: 0.8, marginTop: 10, display: "block" }}>Genre</label>
+          <label style={{ display: "block", fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: 500 }}>
+            Genre
+          </label>
           <input
             value={metadata.genre ?? ""}
             onChange={(e) => setMetadata((m) => ({ ...m, genre: e.target.value }))}
-            style={inputStyle}
+            placeholder="Drama, Action, Comedy..."
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.input,
+              color: colors.text,
+              marginBottom: 16,
+              fontSize: 14
+            }}
           />
 
-          <label style={{ fontSize: 12, opacity: 0.8, marginTop: 10, display: "block" }}>Duration Target (sec)</label>
+          <label style={{ display: "block", fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: 500 }}>
+            Duration Target (sec)
+          </label>
           <input
             type="number"
             value={metadata.duration_target_sec ?? 0}
             onChange={(e) => setMetadata((m) => ({ ...m, duration_target_sec: Number(e.target.value || 0) }))}
-            style={inputStyle}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.input,
+              color: colors.text,
+              marginBottom: 16,
+              fontSize: 14
+            }}
           />
 
-          <label style={{ fontSize: 12, opacity: 0.8, marginTop: 10, display: "block" }}>
+          <label style={{ display: "block", fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: 500 }}>
             Visual Tone Keywords
           </label>
           <input
             value={metadata.visual_tone_keywords ?? ""}
             onChange={(e) => setMetadata((m) => ({ ...m, visual_tone_keywords: e.target.value }))}
-            style={inputStyle}
+            placeholder="Dark, gritty, neon..."
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.input,
+              color: colors.text,
+              marginBottom: 16,
+              fontSize: 14
+            }}
           />
 
-          <label style={{ fontSize: 12, opacity: 0.8, marginTop: 10, display: "block" }}>
+          <label style={{ display: "block", fontSize: 13, color: colors.textMuted, marginBottom: 6, fontWeight: 500 }}>
             Notes for Shot Director
           </label>
           <textarea
-            rows={5}
+            rows={4}
             value={metadata.director_notes ?? ""}
             onChange={(e) => setMetadata((m) => ({ ...m, director_notes: e.target.value }))}
-            style={{ ...inputStyle, resize: "vertical" as const }}
+            placeholder="Specific instructions..."
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.input,
+              color: colors.text,
+              marginBottom: 16,
+              fontSize: 14,
+              resize: "vertical"
+            }}
           />
 
-          <div style={{ marginTop: 12, fontSize: 12, opacity: 0.8 }}>
-            Mode: <strong>{mode ?? "—"}</strong>
-          </div>
-          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-            KIMI enabled: <strong>{mode === "kimi" ? "Yes" : "No / Unknown"}</strong>
+          <div style={{ marginTop: 20, padding: 12, background: colors.input, borderRadius: 6, fontSize: 13 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ color: colors.textMuted }}>Mode:</span>
+              <span style={{ color: colors.text, fontWeight: 600 }}>{mode ?? "—"}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: colors.textMuted }}>AI Enabled:</span>
+              <span style={{ color: mode === "kimi" ? colors.success : colors.textMuted, fontWeight: 600 }}>
+                {mode === "kimi" ? "Yes" : "No"}
+              </span>
+            </div>
           </div>
         </aside>
       </div>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: 10,
-  borderRadius: 12,
-  border: "1px solid #2a2f3a",
-  background: "#0b1020",
-  color: "white",
-  marginTop: 6,
-};
