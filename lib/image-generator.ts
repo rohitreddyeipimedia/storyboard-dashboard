@@ -14,7 +14,7 @@ export async function generateStoryboardSketch(
 Style details: Hand-drawn pencil sketch on white storyboard paper, cinematic lighting, grayscale, film production quality, clear lines, professional storyboard artist style, single frame composition, no text, no letters, no watermarks, clean illustration, detailed shading, movie scene visualization.`;
 
   try {
-    console.log(`Generating sketch for: ${shotDescription.slice(0, 50)}...`);
+    console.log(`[DALL-E] Starting: ${shotDescription.slice(0, 40)}...`);
     
     const response = await openai.images.generate({
       model: "dall-e-3",
@@ -26,14 +26,14 @@ Style details: Hand-drawn pencil sketch on white storyboard paper, cinematic lig
 
     const imageUrl = response.data?.[0]?.url;
     if (!imageUrl) {
-      throw new Error("No image URL returned from DALL-E");
+      throw new Error("No image URL returned");
     }
     
-    console.log(`Sketch generated: ${imageUrl.slice(0, 60)}...`);
+    console.log(`[DALL-E] Complete: ${imageUrl.slice(0, 50)}...`);
     return imageUrl;
   } catch (error: any) {
-    console.error("DALL-E generation failed:", error);
-    throw new Error(`Sketch generation failed: ${error.message}`);
+    console.error("[DALL-E] Failed:", error.message);
+    throw error;
   }
 }
 
@@ -41,6 +41,7 @@ export async function generateAllSketches(
   shots: any[], 
   onProgress?: (current: number, total: number) => void
 ): Promise<any[]> {
+  // This function is kept for compatibility but batching is handled in route.ts
   const updatedShots = [...shots];
   
   for (let i = 0; i < updatedShots.length; i++) {
@@ -48,30 +49,11 @@ export async function generateAllSketches(
     const description = shot.sketch_description || `${shot.shot_type} shot: ${shot.action}`;
     
     try {
-      const imageUrl = await generateStoryboardSketch(
-        description, 
-        shot.shot_type,
-        "pencil sketch"
-      );
-      
-      updatedShots[i] = {
-        ...shot,
-        sketch_image_url: imageUrl
-      };
-      
-      if (onProgress) {
-        onProgress(i + 1, shots.length);
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      const imageUrl = await generateStoryboardSketch(description, shot.shot_type);
+      updatedShots[i] = { ...shot, sketch_image_url: imageUrl };
+      if (onProgress) onProgress(i + 1, shots.length);
     } catch (error) {
-      console.error(`Failed to generate sketch for ${shot.shot_id}:`, error);
-      updatedShots[i] = {
-        ...shot,
-        sketch_image_url: null,
-        sketch_error: "Generation failed"
-      };
+      updatedShots[i] = { ...shot, sketch_image_url: null };
     }
   }
   
