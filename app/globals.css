@@ -1,0 +1,8 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #070a12;
+  color: white;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+* { box-sizing: border-box; }
