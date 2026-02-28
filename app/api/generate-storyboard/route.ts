@@ -15,47 +15,71 @@ export async function POST(req: Request) {
     const metadata = MetadataSchema.parse(body.metadata ?? {});
     let shotlist = ShotlistSchema.parse(body.approved_shotlist);
     const generateImages = body.generate_images !== false;
-    const sketchStyle = body.sketch_style || "pencil sketch";
+    const BATCH_SIZE = 5;
 
-    console.log(`Processing ${shotlist.shots.length} shots, images: ${generateImages}`);
+    console.log(`Processing ${shotlist.shots.length} shots in batches of ${BATCH_SIZE}`);
 
     if (generateImages && process.env.OPENAI_API_KEY) {
-      console.log("Starting DALL-E image generation...");
+      console.log("Starting batched DALL-E generation...");
       
-      const shotsWithImages = [];
-      for (let i = 0; i < shotlist.shots.length; i++) {
-        const shot = shotlist.shots[i] as any;
-        const description = shot.sketch_description || `${shot.shot_type} shot: ${shot.action}`;
+      const shotsWithImages = [...shotlist.shots];
+      const totalBatches = Math.ceil(shotsWithImages.length / BATCH_SIZE);
+      
+      // Process in batches of 5
+      for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+        const startIdx = batchNum * BATCH_SIZE;
+        const endIdx = Math.min(startIdx + BATCH_SIZE, shotsWithImages.length);
+        const currentBatch = shotsWithImages.slice(startIdx, endIdx);
         
-        try {
-          const { generateStoryboardSketch } = await import("@/lib/image-generator");
-          const imageUrl = await generateStoryboardSketch(
-            description,
-            shot.shot_type,
-            sketchStyle
-          );
+        console.log(`Batch ${batchNum + 1}/${totalBatches}: Processing shots ${startIdx + 1}-${endIdx}`);
+        
+        // Generate this batch IN PARALLEL
+        const batchPromises = currentBatch.map(async (shot, idx) => {
+          const globalIndex = startIdx + idx;
+          const shotAny = shot as any;
+          const description = shotAny.sketch_description || `${shotAny.shot_type} shot: ${shotAny.action}`;
           
-          shotsWithImages.push({
-            ...shot,
-            sketch_image_url: imageUrl
-          });
-          
-          console.log(`Generated ${i + 1}/${shotlist.shots.length}: ${shot.shot_id}`);
-          
-          if (i < shotlist.shots.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            const { generateStoryboardSketch } = await import("@/lib/image-generator");
+            const imageUrl = await generateStoryboardSketch(
+              description,
+              shotAny.shot_type,
+              "pencil sketch"
+            );
+            
+            console.log(`✓ Generated: ${shotAny.shot_id} (${globalIndex + 1}/${shotsWithImages.length})`);
+            
+            return {
+              index: globalIndex,
+              shot: { ...shotAny, sketch_image_url: imageUrl }
+            };
+          } catch (error: any) {
+            console.error(`✗ Failed: ${shotAny.shot_id} - ${error.message}`);
+            return {
+              index: globalIndex,
+              shot: { ...shotAny, sketch_image_url: null }
+            };
           }
-          
-        } catch (imgError: any) {
-          console.error(`Failed for ${shot.shot_id}:`, imgError.message);
-          shotsWithImages.push({
-            ...shot,
-            sketch_image_url: null
-          });
+        });
+        
+        // Wait for all 5 to complete
+        const results = await Promise.all(batchPromises);
+        
+        // Update the array with results
+        results.forEach(({ index, shot }) => {
+          shotsWithImages[index] = shot;
+        });
+        
+        // Small delay between batches (1 second) to avoid rate limits
+        if (batchNum < totalBatches - 1) {
+          console.log(`Waiting 1 second before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       
       shotlist = { shots: shotsWithImages };
+      const successCount = shotsWithImages.filter((s: any) => s.sketch_image_url).length;
+      console.log(`Complete! ${successCount}/${shotsWithImages.length} sketches generated`);
     }
 
     const pptxBuffer = await buildStoryboardPptxBuffer({ shotlist, metadata });
