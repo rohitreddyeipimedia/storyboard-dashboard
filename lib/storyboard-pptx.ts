@@ -1,133 +1,202 @@
+// lib/storyboard-pptx.ts
 import PptxGenJS from "pptxgenjs";
-import type { Metadata, Shotlist } from "./schemas";
+import type { Metadata, Shotlist } from "@/lib/schemas";
 
-async function fetchImageAsDataUri(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    const ct = res.headers.get("content-type") || "image/png";
-    const base64 = buf.toString("base64");
-    return `data:${ct};base64,${base64}`;
-  } catch (e) {
-    console.error("Failed to fetch image:", e);
-    return null;
+type BuildArgs = {
+  shotlist: Shotlist;
+  metadata: Metadata;
+};
+
+function safeText(input: unknown, fallback: string) {
+  const s = String(input ?? "").trim();
+  return s.length ? s : fallback;
+}
+
+function setLayoutFromAspect(pptx: PptxGenJS, aspect: Metadata["aspect_ratio"]) {
+  // PptxGen has built-in layouts; portrait is not perfect but acceptable.
+  // If you later want true 9:16 sizing, we can set pptx.defineLayout with custom dims.
+  if (aspect === "9:16") {
+    // closest built-in portrait
+    pptx.layout = "LAYOUT_A4"; // portrait-ish; not exactly 9:16
+  } else {
+    pptx.layout = "LAYOUT_WIDE"; // 13.33 x 7.5
   }
 }
 
-export async function buildStoryboardPptxBuffer({
-  shotlist,
-  metadata,
-}: {
-  shotlist: Shotlist;
-  metadata: Metadata;
-}): Promise<ArrayBuffer> {
-  console.log("Building PPTX for", shotlist.shots?.length || 0, "shots");
-  
-  if (!shotlist.shots || shotlist.shots.length === 0) {
-    throw new Error("No shots provided");
-  }
-
+export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArgs): Promise<Buffer> {
   const pptx = new PptxGenJS();
-  pptx.layout = "LAYOUT_WIDE";
-  pptx.author = "Storyboard Dashboard";
-  pptx.company = metadata.project_name || "Untitled";
 
+  setLayoutFromAspect(pptx, metadata.aspect_ratio);
+
+  pptx.author = "Storyboard Dashboard";
+
+  // FIX: schema uses project_title, not project_name
+  const projectTitle = safeText(metadata.project_title, "Untitled");
+  pptx.company = projectTitle;
+
+  // For LAYOUT_WIDE: 13.33 x 7.5
+  // For LAYOUT_A4: PptxGen internal dims differ, but we can still place roughly.
+  // We'll use a conservative layout that works for both.
   const W = 13.33;
+  const H = 7.5;
+
   const colors = {
-    frame: "1e293b",
-    text: "f1f5f9",
-    accent: "3b82f6"
+    bg: "0B0B0B",
+    panel: "141414",
+    text: "FFFFFF",
+    muted: "B5B5B5",
+    stroke: "2A2A2A",
   };
 
-  // Process each shot
-  for (let i = 0; i < shotlist.shots.length; i++) {
-    const shot = shotlist.shots[i];
+  // Title slide
+  {
     const slide = pptx.addSlide();
+    slide.background = { color: colors.bg };
 
-    // Header
-    slide.addShape(pptx.ShapeType.rect, {
-      x: 0, y: 0, w: W, h: 0.55,
-      fill: { color: "0f172a" },
+    slide.addText(projectTitle, {
+      x: 0.8,
+      y: 1.2,
+      w: W - 1.6,
+      h: 0.8,
+      fontFace: "Inter",
+      fontSize: 34,
+      bold: true,
+      color: colors.text,
     });
 
-    slide.addText(metadata.project_name || "Storyboard", {
-      x: 0.4, y: 0.15, w: 8.5, h: 0.25,
-      fontFace: "Calibri", fontSize: 16, color: colors.text, bold: true,
+    const subtitle = [
+      safeText(metadata.brand, ""),
+      safeText(metadata.director, "") ? `Director: ${metadata.director}` : "",
+      safeText(metadata.dop, "") ? `DoP: ${metadata.dop}` : "",
+      safeText(metadata.aspect_ratio, "") ? `AR: ${metadata.aspect_ratio}` : "",
+    ]
+      .filter(Boolean)
+      .join("  •  ");
+
+    slide.addText(subtitle || "Generated storyboard", {
+      x: 0.8,
+      y: 2.05,
+      w: W - 1.6,
+      h: 0.5,
+      fontFace: "Inter",
+      fontSize: 14,
+      color: colors.muted,
     });
 
-    slide.addText(`${shot.shot_id} • ${shot.shot_type}`, {
-      x: 9.2, y: 0.15, w: 3.8, h: 0.25,
-      fontFace: "Calibri", fontSize: 14, color: colors.accent, bold: true, align: "right",
-    });
-
-    // Storyboard Frame
-    const frameX = 0.6, frameY = 0.85, frameW = 8.8, frameH = 5.4;
-    
-    slide.addShape(pptx.ShapeType.rect, {
-      x: frameX, y: frameY, w: frameW, h: frameH,
-      fill: { color: "ffffff" }, // White background for sketch
-      line: { color: "334155", width: 2 },
-    });
-
-    // EMBED ACTUAL IMAGE if available
-    if (shot.sketch_image_url) {
-      try {
-        const dataUri = await fetchImageAsDataUri(shot.sketch_image_url);
-        if (dataUri) {
-          slide.addImage({
-            data: dataUri,
-            x: frameX + 0.1,
-            y: frameY + 0.1,
-            w: frameW - 0.2,
-            h: frameH - 0.2,
-            sizing: { type: "contain", w: frameW - 0.2, h: frameH - 0.2 }
-          });
-        } else {
-          throw new Error("Failed to load image data");
-        }
-      } catch (e) {
-        // Fallback to text description
-        slide.addText("🎨 AI SKETCH\n\n" + (shot.sketch_description || shot.action), {
-          x: frameX, y: frameY + 2, w: frameW, h: 2,
-          align: "center", fontSize: 14, color: colors.text, bold: true
-        });
-      }
-    } else {
-      // No image - show text placeholder
-      slide.addText("STORYBOARD FRAME\n\n" + (shot.sketch_description || "Visual description pending"), {
-        x: frameX, y: frameY + 2, w: frameW, h: 2,
-        align: "center", fontSize: 16, color: "64748b", bold: true
+    const note = safeText(metadata.notes, "");
+    if (note) {
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: 0.8,
+        y: 2.8,
+        w: W - 1.6,
+        h: 1.1,
+        fill: { color: colors.panel },
+        line: { color: colors.stroke },
+        radius: 10,
+      });
+      slide.addText(note, {
+        x: 1.05,
+        y: 2.95,
+        w: W - 2.1,
+        h: 0.8,
+        fontFace: "Inter",
+        fontSize: 12,
+        color: colors.text,
       });
     }
-
-    // Notes Panel
-    const notesX = 9.6, notesY = 0.85, notesW = 3.13, notesH = 6.2;
-    
-    slide.addShape(pptx.ShapeType.rect, {
-      x: notesX, y: notesY, w: notesW, h: notesH,
-      fill: { color: "0f172a" }, line: { color: "334155" },
-    });
-
-    const camera = shot.camera || {};
-    const lens = shot.lens || {};
-    
-    const notesText = [
-      `SCENE: ${shot.scene_id}`,
-      `ACTION: ${shot.action?.slice(0, 60)}${shot.action?.length > 60 ? '...' : ''}`,
-      "",
-      `CAMERA: ${camera.movement || "Static"} | ${camera.angle || "Eye-level"}`,
-      `LENS: ${lens.mm_range || "Standard"}`,
-      "",
-      `INTENT: ${shot.intent || "N/A"}`
-    ].join("\n");
-
-    slide.addText(notesText, {
-      x: notesX + 0.15, y: notesY + 0.15, w: notesW - 0.3, h: notesH - 0.3,
-      color: colors.text, fontFace: "Calibri", fontSize: 10, valign: "top",
-    });
   }
 
-  const output = await pptx.write({ outputType: "arraybuffer" });
-  return output as ArrayBuffer;
+  // One slide per shot
+  shotlist.shots.forEach((shot, idx) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: colors.bg };
+
+    // Header
+    slide.addText(`${shot.shot_id}  •  ${shot.shot_type}`, {
+      x: 0.6,
+      y: 0.3,
+      w: W - 1.2,
+      h: 0.4,
+      fontFace: "Inter",
+      fontSize: 14,
+      bold: true,
+      color: colors.text,
+    });
+
+    // Left: “Frame” placeholder
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: 0.6,
+      y: 0.9,
+      w: 7.9,
+      h: 6.1,
+      fill: { color: colors.panel },
+      line: { color: colors.stroke },
+      radius: 12,
+    });
+
+    slide.addText(shot.sketch_description || "Storyboard frame placeholder", {
+      x: 0.9,
+      y: 1.1,
+      w: 7.3,
+      h: 5.7,
+      fontFace: "Inter",
+      fontSize: 14,
+      color: colors.muted,
+      valign: "top",
+    });
+
+    // Right: details panel
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: 8.7,
+      y: 0.9,
+      w: W - 9.3,
+      h: 6.1,
+      fill: { color: colors.panel },
+      line: { color: colors.stroke },
+      radius: 12,
+    });
+
+    const lines: string[] = [];
+    lines.push(`Scene: ${shot.scene_id}`);
+    lines.push(`Beat: ${shot.beat_id}`);
+    lines.push("");
+    lines.push(`Action: ${shot.action}`);
+    lines.push("");
+    lines.push(`Intent: ${shot.intent}`);
+    lines.push("");
+    lines.push(`Camera: ${shot.camera.angle}, ${shot.camera.height}`);
+    lines.push(`Move: ${shot.camera.movement} (${shot.camera.support})`);
+    lines.push(`Lens: ${shot.lens.mm_range} — ${shot.lens.rationale}`);
+
+    if (shot.risk_flags?.length) {
+      lines.push("");
+      lines.push(`Flags: ${shot.risk_flags.join(", ")}`);
+    }
+
+    slide.addText(lines.join("\n"), {
+      x: 9.0,
+      y: 1.15,
+      w: W - 9.9,
+      h: 5.6,
+      fontFace: "Inter",
+      fontSize: 11,
+      color: colors.text,
+      valign: "top",
+    });
+
+    // Footer
+    slide.addText(`${idx + 1} / ${shotlist.shots.length}`, {
+      x: W - 1.6,
+      y: H - 0.5,
+      w: 1.0,
+      h: 0.3,
+      fontFace: "Inter",
+      fontSize: 10,
+      color: colors.muted,
+      align: "right",
+    });
+  });
+
+  const arrayBuffer = await pptx.write("arraybuffer");
+  return Buffer.from(arrayBuffer);
 }
