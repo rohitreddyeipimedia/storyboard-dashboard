@@ -71,6 +71,7 @@ export const ShotSchema = z.object({
     .optional(),
   risk_flags: z.array(z.string()).optional().default([]),
   sketch_image_url: z.string().optional(),
+  sketch_description: z.string().optional(), // ADDED THIS
 });
 
 export type Shot = z.infer<typeof ShotSchema>;
