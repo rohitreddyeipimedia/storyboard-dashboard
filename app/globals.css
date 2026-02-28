@@ -1,8 +1,55 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #070a12;
-  color: white;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
 }
+
 * { box-sizing: border-box; }
+
+/* Form elements - Light text on dark backgrounds */
+input, textarea, select {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #475569 !important;
+}
+
+/* Labels - Must be light colored */
+label {
+  color: #94a3b8 !important;
+  font-weight: 500;
+}
+
+/* All text should be readable */
+h1, h2, h3, h4, h5, h6, p, span, div {
+  color: inherit;
+}
+
+/* Table text */
+th {
+  color: #cbd5e1 !important;
+  font-weight: 600;
+}
+
+td {
+  color: #e2e8f0 !important;
+}
+
+/* Button text */
+button {
+  color: white;
+}
+
+/* Links */
+a {
+  color: #60a5fa;
+}
+
+/* Ensure no black text anywhere */
+[style*="color: black"],
+[style*="color: #000"],
+[style*="color: rgb(0, 0, 0)"] {
+  color: #e2e8f0 !important;
+}
