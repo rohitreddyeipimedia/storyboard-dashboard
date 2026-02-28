@@ -5,19 +5,16 @@ import { MetadataSchema, StructuredScriptSchema, ShotlistSchema } from "@/lib/sc
 
 export const runtime = "nodejs";
 
-// Enhanced mock that generates comprehensive shots
 function comprehensiveMockShotlist(structured: any) {
   const shots: any[] = [];
   let shotCounter = 1;
   
   structured.scenes?.forEach((scene: any, sceneIdx: number) => {
-    const scene_id = scene.scene_id || `SC${String(sceneIdx + 1).padStart(3, "0")`;
+    const scene_id = scene.scene_id || `SC${String(sceneIdx + 1).padStart(3, "0")}`;
     const beat_id = scene.beats?.[0]?.beat_id || "B001";
     const content = scene.beats?.map((b: any) => b.action).join(" ") || "";
     
-    // Determine shot types based on content
     const isAction = content.toLowerCase().includes("bowling") || content.toLowerCase().includes("running");
-    const isCloseUp = content.toLowerCase().includes("close-up") || content.toLowerCase().includes("face") || content.toLowerCase().includes("expression");
     const isProduct = content.toLowerCase().includes("product") || content.toLowerCase().includes("box") || content.toLowerCase().includes("bottle") || content.toLowerCase().includes("shoe");
     
     // Shot 1: Establishing/Master
@@ -159,9 +156,8 @@ export async function POST(req: Request) {
   const guideline_text = String(body.guideline_text ?? HOLLYWOOD_GUIDE_TEXT);
   const revision_notes = body.revision_notes ?? undefined;
 
-  // Count scenes to determine expected shot count
   const sceneCount = structured_script.scenes?.length || 0;
-  const expectedShots = Math.max(20, sceneCount * 4); // At least 4 shots per scene
+  const expectedShots = Math.max(20, sceneCount * 4);
 
   if (kimiEnabled()) {
     const agentId = process.env.KIMI_SHOT_DIRECTOR_AGENT_ID || "shot_director";
@@ -170,17 +166,13 @@ export async function POST(req: Request) {
       metadata,
       guideline_text,
       revision_notes,
-      instructions: `Generate a comprehensive shotlist with APPROXIMATELY ${expectedShots} shots total. 
-This script has ${sceneCount} scenes. Aim for 4-6 shots per scene for full coverage.
-Include: WS/MS for masters, MCU/CU for characters, INSERTS for products, ECU for emotional beats, OTS for dialogue.
-Be specific with lens choices and camera movements.`
+      instructions: `Generate a comprehensive shotlist with APPROXIMATELY ${expectedShots} shots total. This script has ${sceneCount} scenes. Aim for 4-6 shots per scene for full coverage.`
     };
 
     try {
       const kimiResp = await callKimiAgent<any>({ agentId, payload: kimiPayload });
-      
-      // Validate we got enough shots
       const shotlist = ShotlistSchema.parse(kimiResp.shotlist ?? kimiResp);
+      
       if (shotlist.shots.length < 10) {
         console.warn(`AI returned only ${shotlist.shots.length} shots, using comprehensive mock`);
         return NextResponse.json({ shotlist: comprehensiveMockShotlist(structured_script), mode: "mock-enhanced" });
@@ -193,7 +185,6 @@ Be specific with lens choices and camera movements.`
     }
   }
 
-  // Use comprehensive mock
   const shotlist = ShotlistSchema.parse(comprehensiveMockShotlist(structured_script));
   return NextResponse.json({ shotlist, mode: "mock" });
 }
