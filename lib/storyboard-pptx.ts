@@ -83,7 +83,6 @@ export async function buildStoryboardPptxBuffer({
       h: frameH,
       fill: { color: "0B1220" },
       line: { color: "334155" },
-      radius: 0.18,
     });
 
     if (shot.sketch_image_url) {
@@ -135,7 +134,6 @@ export async function buildStoryboardPptxBuffer({
       h: notesH,
       fill: { color: "0F172A" },
       line: { color: "334155" },
-      radius: 0.18,
     });
 
     const notes = [
