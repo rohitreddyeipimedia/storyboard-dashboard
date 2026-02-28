@@ -20,7 +20,7 @@ export async function callKimiAgent<T>({
   }
 
   const systemPrompt = agentId.includes("storyboard")
-    ? `You are an expert Storyboard Artist AI. Given a shotlist and metadata, enhance each shot with detailed visual descriptions and composition notes. Return JSON format with "updated_shotlist" containing the enhanced shots array.`
+    ? `You are an expert Storyboard Artist AI. Given a shotlist and metadata, enhance each shot with detailed visual descriptions and composition notes. Return ONLY valid JSON format with "updated_shotlist" containing the enhanced shots array.`
     : `You are an expert Hollywood Shot Director AI with 20 years of experience in feature films. Given a structured script and metadata, generate a comprehensive shotlist following industry standards. 
 
 For each shot, include:
@@ -34,7 +34,7 @@ For each shot, include:
 - continuity_notes: {line_of_action, eyelines, match_action, props_wardrobe}
 - risk_flags (array of strings)
 
-Return JSON format with a "shots" array containing 2-5 shots per scene. Be specific with lens choices (e.g., "24mm", "85mm") and camera movements.`;
+Return ONLY valid JSON format with a "shots" array containing 2-5 shots per scene. Be specific with lens choices (e.g., "24mm", "85mm") and camera movements.`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -44,7 +44,7 @@ Return JSON format with a "shots" array containing 2-5 shots per scene. Be speci
         { role: "user", content: JSON.stringify(payload) }
       ],
       temperature: 0.7,
-      response_format: { type: "json_object" }
+      max_tokens: 4000,
     });
 
     const content = completion.choices[0].message.content;
@@ -52,7 +52,13 @@ Return JSON format with a "shots" array containing 2-5 shots per scene. Be speci
       throw new Error("Empty response from OpenAI");
     }
 
-    return JSON.parse(content) as T;
+    // Extract JSON from response (in case GPT adds markdown or text)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in response");
+    }
+
+    return JSON.parse(jsonMatch[0]) as T;
   } catch (error: any) {
     console.error("OpenAI API error:", error);
     throw new Error(`AI generation failed: ${error.message}`);
