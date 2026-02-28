@@ -26,17 +26,15 @@ export async function POST(req: Request) {
     }
   }
 
-  const pptxBuf = await buildStoryboardPptxBuffer({ shotlist, metadata });
+  const pptxBuffer = await buildStoryboardPptxBuffer({ shotlist, metadata });
   const filename = `${metadata.project_name.replace(/[^\w\-]+/g, "_")}_Storyboard.pptx`;
   
-  // Convert Buffer to Uint8Array for NextResponse compatibility
-  const uint8Array = new Uint8Array(pptxBuf);
+  const uint8Array = new Uint8Array(pptxBuffer);
 
   return new NextResponse(uint8Array, {
     status: 200,
     headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },
