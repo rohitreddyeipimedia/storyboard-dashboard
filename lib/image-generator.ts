@@ -9,7 +9,6 @@ export async function generateStoryboardSketch(
   shotType: string,
   style: string = "pencil sketch"
 ): Promise<string> {
-  // Create a detailed prompt for cinematic storyboard
   const prompt = `Professional film storyboard frame, ${style}, ${shotType} shot composition: ${shotDescription}. 
 
 Style details: Hand-drawn pencil sketch on white storyboard paper, cinematic lighting, grayscale, film production quality, clear lines, professional storyboard artist style, single frame composition, no text, no letters, no watermarks, clean illustration, detailed shading, movie scene visualization.`;
@@ -25,7 +24,7 @@ Style details: Hand-drawn pencil sketch on white storyboard paper, cinematic lig
       response_format: "url",
     });
 
-    const imageUrl = response.data[0]?.url;
+    const imageUrl = response.data?.[0]?.url;
     if (!imageUrl) {
       throw new Error("No image URL returned from DALL-E");
     }
@@ -38,7 +37,6 @@ Style details: Hand-drawn pencil sketch on white storyboard paper, cinematic lig
   }
 }
 
-// Generate all sketches for a shotlist with progress tracking
 export async function generateAllSketches(
   shots: any[], 
   onProgress?: (current: number, total: number) => void
@@ -47,10 +45,7 @@ export async function generateAllSketches(
   
   for (let i = 0; i < updatedShots.length; i++) {
     const shot = updatedShots[i];
-    
-    // Generate sketch description if not present
-    const description = shot.sketch_description || 
-                       `${shot.shot_type} shot: ${shot.action}`;
+    const description = shot.sketch_description || `${shot.shot_type} shot: ${shot.action}`;
     
     try {
       const imageUrl = await generateStoryboardSketch(
@@ -68,12 +63,10 @@ export async function generateAllSketches(
         onProgress(i + 1, shots.length);
       }
       
-      // Small delay to avoid rate limits
       await new Promise(resolve => setTimeout(resolve, 500));
       
     } catch (error) {
       console.error(`Failed to generate sketch for ${shot.shot_id}:`, error);
-      // Continue with other shots even if one fails
       updatedShots[i] = {
         ...shot,
         sketch_image_url: null,
