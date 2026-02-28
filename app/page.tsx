@@ -29,6 +29,8 @@ export default function Home() {
   const [mode, setMode] = useState<"mock" | "kimi" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generateSketches, setGenerateSketches] = useState(true);
+  const [generationProgress, setGenerationProgress] = useState("");
 
   const canGoShotlist = Boolean(shotlist);
   const canGoStoryboard = Boolean(approved);
@@ -84,19 +86,20 @@ export default function Home() {
   async function downloadStoryboardPptx() {
     setError(null);
     setBusy(true);
+    setGenerationProgress(generateSketches ? "Generating AI sketches... (this may take 2-3 minutes)" : "");
+    
     try {
       if (!approved) throw new Error("Approve shotlist first.");
 
       const res = await apiPost("/api/generate-storyboard", {
         approved_shotlist: approved,
         metadata,
-        sketch_style: "pencil",
+        sketch_style: "pencil sketch",
+        generate_images: generateSketches,
       });
 
       const blob = await res.blob();
-      const cd = res.headers.get("content-disposition") || "";
-      const filename =
-        /filename="([^"]+)"/.exec(cd)?.[1] || "Storyboard.pptx";
+      const filename = generateSketches ? "Storyboard_With_AI_Sketches.pptx" : "Storyboard.pptx";
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -106,14 +109,15 @@ export default function Home() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      
     } catch (e: any) {
       setError(e.message || "Failed");
     } finally {
       setBusy(false);
+      setGenerationProgress("");
     }
   }
 
-  // Color scheme
   const colors = {
     bg: "#0f172a",
     panel: "#1e293b",
@@ -270,7 +274,7 @@ export default function Home() {
             <>
               <h2 style={{ marginTop: 0, marginBottom: 8, color: colors.text }}>Shotlist Review</h2>
               <p style={{ color: colors.textMuted, marginTop: 0, marginBottom: 16, fontSize: 14 }}>
-                Review the generated shots. Approve to proceed to storyboard generation.
+                {shotlist?.shots?.length || 0} shots generated. Review and approve to generate storyboard.
               </p>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -369,8 +373,53 @@ export default function Home() {
             <>
               <h2 style={{ marginTop: 0, marginBottom: 8, color: colors.text }}>Storyboard Review</h2>
               <p style={{ color: colors.textMuted, marginTop: 0, marginBottom: 16, fontSize: 14 }}>
-                Generate PowerPoint presentation with {approved?.shots?.length || 0} slides.
+                Generate PowerPoint with {approved?.shots?.length || 0} slides.
               </p>
+
+              {/* DALL-E TOGGLE */}
+              <div style={{ marginBottom: 20, padding: 16, background: colors.input, borderRadius: 8, border: `1px solid ${colors.border}` }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={generateSketches}
+                    onChange={(e) => setGenerateSketches(e.target.checked)}
+                    style={{ width: 20, height: 20, accentColor: colors.primary }}
+                  />
+                  <div>
+                    <div style={{ color: colors.text, fontWeight: 600, fontSize: 14 }}>
+                      Generate AI Sketches with DALL-E 3
+                    </div>
+                    <div style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                      Creates pencil sketch images for each shot (~4s per image)
+                    </div>
+                  </div>
+                </label>
+                
+                {generateSketches && approved?.shots?.length > 0 && (
+                  <div style={{ 
+                    marginTop: 12, 
+                    padding: 12, 
+                    background: colors.panel, 
+                    borderRadius: 6,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <span style={{ color: colors.textMuted, fontSize: 13 }}>
+                      Estimated cost: ~${(approved.shots.length * 0.04).toFixed(2)} USD
+                    </span>
+                    <span style={{ color: colors.textMuted, fontSize: 13 }}>
+                      Time: ~{Math.ceil(approved.shots.length * 5)} seconds
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {generationProgress && (
+                <div style={{ marginBottom: 16, padding: 12, background: "rgba(59, 130, 246, 0.1)", borderRadius: 8, color: colors.primary }}>
+                  {generationProgress}
+                </div>
+              )}
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button
@@ -388,7 +437,7 @@ export default function Home() {
                     fontSize: 14
                   }}
                 >
-                  {busy ? "Building..." : "Download PPTX"}
+                  {busy ? (generateSketches ? "Generating Sketches..." : "Building PPTX...") : (generateSketches ? "Generate with AI Sketches" : "Download PPTX (Text Only)")}
                 </button>
               </div>
 
@@ -400,12 +449,14 @@ export default function Home() {
                 border: `1px dashed ${colors.border}`,
                 textAlign: "center"
               }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>🎬</div>
                 <div style={{ color: colors.text, fontWeight: 600, marginBottom: 4 }}>
                   {approved?.shots?.length || 0} shots ready
                 </div>
                 <div style={{ color: colors.textMuted, fontSize: 13 }}>
-                  PowerPoint format (.pptx) with frames and notes
+                  {generateSketches 
+                    ? "Each slide will include an AI-generated pencil sketch" 
+                    : "Each slide will include shot description text"}
                 </div>
               </div>
             </>
