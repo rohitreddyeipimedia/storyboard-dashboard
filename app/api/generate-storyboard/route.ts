@@ -20,17 +20,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    // Expect: { shotlist: { shots: [...] }, metadata: {...} }
     const shotlist = ShotlistSchema.parse(body.shotlist);
     const metadata = MetadataSchema.parse(body.metadata ?? {});
 
     const pptxBuffer = await buildStoryboardPptxBuffer({ shotlist, metadata });
 
-    // FIX: schema field is project_title (not project_name)
     const title = metadata.project_title || "Storyboard";
     const filename = `${safeFilenameBase(title)}_Storyboard.pptx`;
 
-    return new NextResponse(pptxBuffer, {
+    // ✅ Convert Node Buffer -> Uint8Array (BodyInit-compatible)
+    const bytes = new Uint8Array(pptxBuffer);
+
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
         "Content-Type":
