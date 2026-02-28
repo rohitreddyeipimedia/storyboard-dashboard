@@ -1,90 +1,82 @@
-import OpenAI from "openai";
+// lib/kimi.ts
+type CallKimiArgs = {
+  agentId: string;
+  payload: unknown;
+};
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [k: string]: JsonValue }
+  | JsonValue[];
 
-export function kimiEnabled() {
-  return Boolean(process.env.OPENAI_API_KEY);
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-export async function callKimiAgent<T>({
-  agentId,
-  payload,
-}: {
-  agentId: string;
-  payload: any;
-}): Promise<T> {
-  if (!kimiEnabled()) {
-    throw new Error("OpenAI API key not configured");
+/**
+ * Enable/disable Kimi usage (you already call this).
+ * You can toggle with:
+ * - KIMI_ENABLED=true
+ * and required:
+ * - KIMI_API_BASE
+ * - KIMI_API_KEY
+ */
+export function kimiEnabled(): boolean {
+  const enabled = String(process.env.KIMI_ENABLED ?? "").toLowerCase();
+  if (enabled !== "true" && enabled !== "1" && enabled !== "yes") return false;
+  return Boolean(process.env.KIMI_API_BASE && process.env.KIMI_API_KEY);
+}
+
+/**
+ * Calls a Kimi "agent" endpoint via fetch.
+ *
+ * Expected env:
+ * - KIMI_API_BASE  e.g. https://your-kimi-gateway.com
+ * - KIMI_API_KEY
+ *
+ * This function is GENERIC and returns typed JSON.
+ */
+export async function callKimiAgent<T = any>({ agentId, payload }: CallKimiArgs): Promise<T> {
+  const base = process.env.KIMI_API_BASE;
+  const key = process.env.KIMI_API_KEY;
+
+  if (!base || !key) {
+    throw new Error("Kimi env not configured. Set KIMI_API_BASE and KIMI_API_KEY.");
   }
 
-  const isStoryboard = agentId.includes("storyboard");
-  const sceneCount = payload.structured_script?.scenes?.length || 5;
-  const expectedShots = sceneCount * 5; // 5 shots per scene
-  
-  const systemPrompt = isStoryboard
-    ? `You are a Storyboard Artist AI. Enhance the provided shotlist with visual descriptions. Return JSON: {"updated_shotlist":{"shots":[...]}}`
-    : `You are a Hollywood Shot Director AI. Generate a COMPREHENSIVE shotlist.
+  const url = `${base.replace(/\/$/, "")}/agents/${encodeURIComponent(agentId)}`;
 
-CRITICAL: Generate ${expectedShots} shots for this ${sceneCount}-scene script (4-6 shots per scene).
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify(payload),
+  });
 
-Shot type guidelines:
-- WS (Wide Shot): Establishing, action coverage
-- MS (Medium Shot): Dialogue, two-shots
-- MCU (Med Close Up): Character reactions
-- CU (Close Up): Emphasis, dialogue
-- ECU (Extreme Close Up): Eyes, products, details
-- INSERT: Hands, objects, products
-- OTS (Over Shoulder): Dialogue scenes
-- POV: Character point of view
+  const text = await resp.text();
+  if (!resp.ok) {
+    throw new Error(`Kimi agent call failed (${resp.status}): ${text.slice(0, 500)}`);
+  }
 
-For EACH shot include:
-- shot_id: S001, S002, etc. (sequential across all scenes)
-- scene_id: from input
-- shot_type: choose from list above
-- action: detailed blocking
-- intent: story/emotional purpose
-- camera: {angle, height, movement, support}
-- lens: {mm_range, rationale}
-- continuity_notes: {line_of_action, eyelines, match_action, props_wardrobe}
-- risk_flags: []
-
-Return JSON: {"shots":[...array of ${expectedShots} shots...]}`;
-
+  let parsed: unknown;
   try {
-    console.log(`Requesting ~${expectedShots} shots for ${sceneCount} scenes`);
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(payload) }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000, // Increased for more shots
-    });
-
-    const content = completion.choices[0].message.content;
-    if (!content) {
-      throw new Error("Empty response from OpenAI");
-    }
-
-    // Extract JSON
-    let jsonStr = content;
-    if (content.includes("```json")) {
-      jsonStr = content.split("```json")[1].split("```")[0];
-    } else if (content.includes("```")) {
-      jsonStr = content.split("```")[1].split("```")[0];
-    }
-    
-    jsonStr = jsonStr.trim();
-    const parsed = JSON.parse(jsonStr);
-    console.log(`Received ${parsed.shots?.length || 0} shots from AI`);
-    
-    return parsed as T;
-  } catch (error: any) {
-    console.error("OpenAI API error:", error);
-    throw new Error(`AI generation failed: ${error.message}`);
+    parsed = JSON.parse(text) as JsonValue;
+  } catch {
+    // If server returns non-JSON, fail loudly
+    throw new Error(`Kimi returned non-JSON: ${text.slice(0, 500)}`);
   }
+
+  // Some gateways wrap the result (common patterns)
+  if (isRecord(parsed)) {
+    // e.g. { data: {...} } or { result: {...} }
+    if (parsed.data) return parsed.data as T;
+    if (parsed.result) return parsed.result as T;
+  }
+
+  return parsed as T;
 }
