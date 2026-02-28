@@ -14,7 +14,6 @@ function safeText(input: unknown, fallback: string) {
 
 function setLayoutFromAspect(pptx: PptxGenJS, aspect: Metadata["aspect_ratio"]) {
   if (aspect === "9:16") {
-    // closest built-in portrait-ish layout
     pptx.layout = "LAYOUT_A4";
   } else {
     pptx.layout = "LAYOUT_WIDE";
@@ -31,7 +30,6 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
   const projectTitle = safeText(metadata.project_title, "Untitled");
   pptx.company = projectTitle;
 
-  // WIDE baseline coords; still works acceptably for A4 with minor spacing differences.
   const W = 13.33;
   const H = 7.5;
 
@@ -106,7 +104,6 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
     const slide = pptx.addSlide();
     slide.background = { color: colors.bg };
 
-    // Header
     slide.addText(`${shot.shot_id}  •  ${shot.shot_type}`, {
       x: 0.6,
       y: 0.3,
@@ -118,7 +115,7 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
       color: colors.text,
     });
 
-    // Left: “Frame” placeholder
+    // Frame placeholder (left)
     slide.addShape(pptx.ShapeType.roundRect, {
       x: 0.6,
       y: 0.9,
@@ -139,7 +136,7 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
       valign: "top",
     });
 
-    // Right: details panel
+    // Details panel (right)
     slide.addShape(pptx.ShapeType.roundRect, {
       x: 8.7,
       y: 0.9,
@@ -177,7 +174,6 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
       valign: "top",
     });
 
-    // Footer
     slide.addText(`${idx + 1} / ${shotlist.shots.length}`, {
       x: W - 1.6,
       y: H - 0.5,
@@ -190,6 +186,8 @@ export async function buildStoryboardPptxBuffer({ shotlist, metadata }: BuildArg
     });
   });
 
-  const arrayBuffer = await pptx.write("arraybuffer");
+  // ✅ Correct for your pptxgenjs typings: pass WriteProps object
+  const arrayBuffer = (await pptx.write({ outputType: "arraybuffer" } as any)) as ArrayBuffer;
+
   return Buffer.from(arrayBuffer);
 }
